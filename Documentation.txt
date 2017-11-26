@@ -1,0 +1,70 @@
+"""
+Created on Thu July 13 10:30 2017
+
+@author: irvin.ding
+
+"""
+
+Documentation of Implementation of OpenCLGA for Skew-setting:
+
+In this algorithm development, OpenCLGA is the main utility library that is implemented for GPU computation offloading. Basic usage and utility questions are included in the library documentation: https://github.com/PyOCL/OpenCLGA/wiki
+
+
+Preparation:
+Python 3.5 with numpy, pytools, cffi, mako, pyopencl
+Visual C++ 14.0
+Windows 7 Universal C Runtime Package
+Intel SDK and NVIDIA GPU Driver
+
+Funcationality:
+The algo can be suitably applied to the fitting process without knowing the exact format/component of a formula/expression/combination of interest. This GP algo allows the user to specify a list of components, and the corresponding sets that each of those could mutate within. The final result would be the best fitted individual throughout the evolution process. Yet the limitation is clear that if the true formula/combination is complicated enought, the shuffling period (GP run) could be time and resources consuming.
+
+To make sure the algorithm run, one needs to have data_reader.py, theo.py, theo.cl under the same directory with a specified dataset.
+
+
+Most of the settings are specified in theo.py (python):
+	1. check the file name of the dataset is correct as an argument of data_extract
+	   data_extract saves the dataset into a 3-D array in python
+	2. Under Input Arguments, create new variables if have more inputs.
+	3. In the run function, key parameters of GP are specified:
+		a. the terminals set should contain all variables and constant values
+		b. the functions1 set should contain all operations that take one argument, e.g. sin()
+		c. the functions2 set should contain all operations that take two arguments, e.g. max(,)
+		d. In the depth section, a minimum depth and a maximum depth should be specified.
+		   The actual depth of the tree will be randomly generated in between.
+		e. Tree Initialization chunk creates a randomly generated tree structure as a computational formula.
+		   The tree is stored in a list in a breadth first manner.
+		f. Sample Chromosome defines the format of the chromosome throughout the evolution
+		   The chromosome should be a list of genes
+		   Two options for chromosomes: simple chromosome and shuffle chromosome
+		   Within a gene, the first argument is the content of the gene; the second argument is the set of possible mutation options; the third argument is a name tag, optional. (dna, elements, 'name')
+		g. Make sure that the path for the theo.cl file is correct (it should be by default)
+		h. OpenCLGA function arguments should be modified accordingly.
+		i. fitness_arg matches the number of variables and all other numbers one want to pass to the CL evaluation process. If the evaluation function is not changed, one should only add/drop variables
+		j. elitism mode is commented out. If one were to use it, "top" is the number of individuals that will survive till next generation
+		k. mutation probability and crossover probability are should be munally specified
+		l. test data output section can be removed
+		m. iteratioins can be removed
+		n. specify population size and number of generations
+
+
+CL file contains the evaluation process (OpenCL, C based):
+	1. define all the computational operations at the beginning of the file;
+	2. The chromosome passed in is a list of integers. Each gene is translated to the index of the dna in elements set.
+	2. build_root is a function to translate chromosome into tuples, as thare are in the python list, shouln't require any change
+	3. tree function rebuilds the tree structure from the tuples, shouldn't require any change
+	4. eval function takes all variables as inputs, be sure to add in the header if more inputs are taken
+	5. any change in variables or operations should be reflected in eval function: add/drop a case under the correct category.
+	6. theo_fitness - the main fitness function takes all variables as inputs. Make sure that any change in variables get reflected in the header.
+	7. Any arguments get passed from the python file should be imported here, as global int*/float*/...;
+	8. Any single integer/float passed in from python file can be extracted by dereferencing
+	9. the preset length of tuples, parent, and descendants list are for a maximum amount of memory occupation for a 18-level tree. As the tree gets larger, the upper limit of the length of the arrays needs to be extended.
+	10. notice that any change in variable should be reflected in the calling of eval function
+	11. dereference fitness pointer and change value
+
+
+Potential Problems to be solved:
+	1. Potential bug unsolved: occasionally the fitness printed would appear to be unstable, fluctuating drastically, which should not happen since the algo should only pick the best fitness and the best individuals were supposed to be preserved.
+	2. Potential bug unsolved: occasionally there will appear a better performance in one generation but seems to be unsaved. the fitness score bounces back to the previous level after a one generation improvement.
+	3. The standard deviation of the fitness score (with 1000 population for 1000 generation) is significant enought to notice, which is a reasonable result from the random nature of the algo. However, a potential change to get the process directed might help the performance
+	4. Trade-off between running time and complexity of the tree is an important issue.
